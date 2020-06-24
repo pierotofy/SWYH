@@ -28,6 +28,7 @@ namespace SWYH.Audio
     using NAudio.CoreAudioApi;
     using System;
     using System.Threading;
+    using System.Diagnostics;
 
     internal class WasapiProvider
     {

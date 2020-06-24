@@ -23,6 +23,7 @@
 
 namespace SWYH
 {
+    using NAudio.CoreAudioApi;
     using OpenSource.UPnP.AV.RENDERER.CP;
     using Semver;
     using SWYH.Audio;
@@ -111,6 +112,37 @@ namespace SWYH
                     this.swyhDevice.Start();
                     notifyIcon.ShowBalloonTip(2000, "Stream What You Hear is running", "Right-click on this icon to show the menu !", System.Windows.Forms.ToolTipIcon.Info);
                 }
+            }
+
+            new Thread(() =>
+            {
+                var devEnum = new MMDeviceEnumerator();
+                var defaultDevice = devEnum.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+
+                while (true)
+                {
+                    Thread.CurrentThread.IsBackground = true;
+                    if (defaultDevice.AudioMeterInformation.PeakValues[0] * 100 > 0)
+                    {
+                        foreach (System.Windows.Forms.ToolStripItem tsi in this.streamToMenu.DropDownItems)
+                        {
+                            var item = tsi as System.Windows.Forms.ToolStripMenuItem;
+                            if (item != null && !item.Checked && autoStreamTo.Any(r => r.Equals(item.Text, StringComparison.InvariantCultureIgnoreCase)))
+                            {
+                                streamMenu_RendererSelected(tsi, EventArgs.Empty);
+                            }
+                        }
+                    }
+                    Thread.Sleep(1000);
+                }
+            }).Start();
+        }
+
+        public static MMDevice GetDefaultRenderDevice()
+        {
+            using (var enumerator = new MMDeviceEnumerator())
+            {
+                return enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
             }
         }
 
@@ -250,30 +282,33 @@ namespace SWYH
             }));
         }
 
-        private void streamMenu_RendererSelected(object sender, EventArgs e)
+        public void streamMenu_RendererSelected(object sender, EventArgs e)
         {
-            var rendererItem = (System.Windows.Forms.ToolStripMenuItem)sender;
-            var renderer = rendererItem.Tag as AVRenderer;
-            if (renderer != null && renderer.Connections.Count > 0)
+            this.Dispatcher.BeginInvoke(new Action(() =>
             {
-                var connectionAV = renderer.Connections[0] as AVConnection;
-                if (rendererItem.Checked)
+                var rendererItem = (System.Windows.Forms.ToolStripMenuItem)sender;
+                var renderer = rendererItem.Tag as AVRenderer;
+                if (renderer != null && renderer.Connections.Count > 0)
                 {
-                    rendererItem.Checked = false;
-                    connectionAV.Stop();
-                }
-                else
-                {
-                    rendererItem.Checked = true;
-                    var media = this.swyhDevice.ContentDirectory.GetWasapiMediaItem();
-                    if (media != null)
+                    var connectionAV = renderer.Connections[0] as AVConnection;
+                    if (rendererItem.Checked)
                     {
+                        rendererItem.Checked = false;
                         connectionAV.Stop();
-                        renderer.CreateConnection(media, DateTime.Now.Ticks);
-                        connectionAV.Play();
+                    }
+                    else
+                    {
+                        rendererItem.Checked = true;
+                        var media = this.swyhDevice.ContentDirectory.GetWasapiMediaItem();
+                        if (media != null)
+                        {
+                            connectionAV.Stop();
+                            renderer.CreateConnection(media, DateTime.Now.Ticks);
+                            connectionAV.Play();
+                        }
                     }
                 }
-            }
+            }));
         }
 
         private void connectionAV_OnPlayStateChanged(AVConnection sender, AVConnection.PlayState NewState)

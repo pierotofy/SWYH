@@ -21,6 +21,7 @@ using System.Threading;
 using System.Collections;
 using System.Net.Sockets;
 using OpenSource.Utilities;
+using System.Diagnostics;
 
 namespace OpenSource.UPnP
 {
@@ -485,6 +486,8 @@ namespace OpenSource.UPnP
                     MainSocket = null;
                 }
                 if (Disconnect == true && OK == true) OnDisconnectEvent.Fire(this);
+
+                
             }
         }
 
